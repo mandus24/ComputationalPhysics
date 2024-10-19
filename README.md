@@ -1,3 +1,1 @@
 # CompuationalPhysics
-# ComputationalPhysics
-# ComputationalPhysics
