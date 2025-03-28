@@ -117,8 +117,8 @@ def get_3d_rotation_matrix(g):
     R_y90 = np.array([[0, 0, 1], [0, 1, 0], [-1, 0, 0]])
     R_z90 = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
     
-    # For simplicity, let's implement a subset of the 24 proper rotations
-    # and combine them with reflections for variety
+    # implement a subset of the 24 proper rotations + reflections
+
     rotations = [
         np.eye(3),  # identity
         R_x90,  # 90° around x
@@ -160,19 +160,7 @@ def symmetry_op(coord):
     return coord, g
 
 # NEW FUNCTION: Calculate interaction energy between non-bonded monomers
-def calculate_interaction_energy(coords, interaction_strength=1.0, interaction_range=2.0, lennard_jones=False):
-    """
-    Calculate the energy of a configuration based on non-bonded interactions.
-    
-    Parameters:
-    - coords: The coordinates of the polymer
-    - interaction_strength: Positive for repulsion, negative for attraction
-    - interaction_range: Distance cutoff for interactions
-    - lennard_jones: Whether to use Lennard-Jones potential instead of simple r^(-6)
-    
-    Returns:
-    - Total energy of the configuration
-    """
+def calculate_interaction_energy(coords, interaction_strength=1.0, interaction_range=2.0, lennard_jones=True):
     N = coords.shape[1]
     energy = 0.0
     
@@ -198,60 +186,32 @@ def calculate_interaction_energy(coords, interaction_strength=1.0, interaction_r
     
     return energy
 
-# NEW FUNCTION: Calculate bending energy
+# Calculate bending energy
 def calculate_bending_energy(coords, stiffness=1.0):
-    """
-    Calculate the bending energy of a polymer chain.
-    
-    Parameters:
-    - coords: The coordinates of the polymer
-    - stiffness: Bending stiffness parameter (higher = stiffer)
-    
-    Returns:
-    - Total bending energy
-    """
     N = coords.shape[1]
     energy = 0.0
     
     for i in range(1, N-1):
-        # Calculate vectors between adjacent monomers
         v1 = coords[:, i] - coords[:, i-1]
         v2 = coords[:, i+1] - coords[:, i]
         
-        # Normalize vectors
         v1_norm = np.linalg.norm(v1)
         v2_norm = np.linalg.norm(v2)
         
-        if v1_norm > 0 and v2_norm > 0:  # Avoid division by zero
+        if v1_norm > 0 and v2_norm > 0:  
             v1 = v1 / v1_norm
             v2 = v2 / v2_norm
             
-            # Calculate cosine of angle
             cos_angle = np.dot(v1, v2)
-            # Clamp cos_angle to [-1, 1] to avoid numerical issues
             cos_angle = max(min(cos_angle, 1.0), -1.0)
             
-            # Penalize deviations from straight configuration (cos_angle = 1)
             energy += stiffness * (1 - cos_angle)
     
     return energy
 
-# NEW FUNCTION: Calculate total energy
+# Calculate total energy
 def calculate_total_energy(coords, interaction_strength=1.0, interaction_range=2.0, 
                           stiffness=1.0, use_lennard_jones=False):
-    """
-    Calculate the total energy of a polymer configuration.
-    
-    Parameters:
-    - coords: The coordinates of the polymer
-    - interaction_strength: Parameter for non-bonded interactions
-    - interaction_range: Distance cutoff for interactions
-    - stiffness: Parameter for chain stiffness
-    - use_lennard_jones: Whether to use Lennard-Jones potential
-    
-    Returns:
-    - Total energy (interaction + bending)
-    """
     interaction_e = calculate_interaction_energy(
         coords, interaction_strength, interaction_range, use_lennard_jones
     )
@@ -259,25 +219,9 @@ def calculate_total_energy(coords, interaction_strength=1.0, interaction_range=2
     
     return interaction_e + bending_e
 
-# MODIFIED FUNCTION: Modified pivot step with Metropolis criterion
+# Modified pivot step with Metropolis criterion
 def pivot_step_with_metropolis(coord, temperature=1.0, interaction_strength=1.0, 
                               interaction_range=2.0, stiffness=1.0, use_lennard_jones=False):
-    """
-    Perform a pivot move with Metropolis acceptance criterion.
-    
-    Parameters:
-    - coord: Current polymer configuration
-    - temperature: Simulation temperature (affects acceptance probability)
-    - interaction_strength: Strength of non-bonded interactions
-    - interaction_range: Range cutoff for interactions
-    - stiffness: Chain stiffness parameter
-    - use_lennard_jones: Whether to use Lennard-Jones potential
-    
-    Returns:
-    - New configuration
-    - Whether the move was accepted
-    - Current energy
-    """
     N = np.size(coord, axis=1)
     pivot = np.random.randint(1, N-1)  # Avoid selecting the very last monomer as pivot
     
@@ -315,24 +259,9 @@ def pivot_step_with_metropolis(coord, temperature=1.0, interaction_strength=1.0,
     else:
         return coord, accepted, energy_before
 
-# MODIFIED FUNCTION: Run simulation with energy calculations
+# Run simulation with energy calculations
 def pivot_run_with_energy(coord, iterations, temperature=1.0, interaction_strength=1.0, 
                          interaction_range=2.0, stiffness=1.0, use_lennard_jones=False):
-    """
-    Run the pivot algorithm with interaction energies.
-    
-    Parameters:
-    - coord: Initial polymer configuration
-    - iterations: Number of MC steps to perform
-    - temperature: Simulation temperature
-    - interaction_strength: Strength of non-bonded interactions
-    - interaction_range: Range cutoff for interactions
-    - stiffness: Chain stiffness parameter
-    - use_lennard_jones: Whether to use Lennard-Jones potential
-    
-    Returns:
-    - Lists of observables and statistics
-    """
     if not hasattr(pivot_run_with_energy, 'acceptance_stats'):
         pivot_run_with_energy.acceptance_stats = {'attempts': 0, 'accepted': 0}
     
@@ -412,16 +341,6 @@ def binning_analyis(data, kmax):
 # NEW FUNCTION: Enhanced 3D walk plotting with interaction energy coloring
 def plot_3d_walk_with_energy(coord, filename=None, interaction_strength=1.0, 
                             interaction_range=2.0, colorful=True):
-    """
-    Plot a 3D polymer with coloring based on interaction energies.
-    
-    Parameters:
-    - coord: Polymer coordinates
-    - filename: Output filename for saving
-    - interaction_strength: Strength of interactions
-    - interaction_range: Range of interactions
-    - colorful: Whether to color by local energy
-    """
     fig = plt.figure(figsize=(12, 10))
     ax = fig.add_subplot(111, projection='3d')
     
@@ -489,7 +408,7 @@ def plot_3d_walk_with_energy(coord, filename=None, interaction_strength=1.0,
     
     title = "3D Polymer Simulation"
     if interaction_strength > 0:
-        title += " (Repulsive)"
+        title += " (Attractive)"
     elif interaction_strength < 0:
         title += " (Attractive)"
     plt.title(title)
@@ -499,15 +418,6 @@ def plot_3d_walk_with_energy(coord, filename=None, interaction_strength=1.0,
 
 # NEW FUNCTION: Compare different polymer configurations
 def compare_polymer_configurations(configs, labels, filename=None, view_angle=(30, 30)):
-    """
-    Plot multiple polymer configurations for comparison.
-    
-    Parameters:
-    - configs: List of polymer configurations
-    - labels: List of labels for each configuration
-    - filename: Output filename for saving
-    - view_angle: Viewing angle for 3D plot
-    """
     n_configs = len(configs)
     fig = plt.figure(figsize=(5*n_configs, 10))
     
@@ -559,16 +469,6 @@ def compare_polymer_configurations(configs, labels, filename=None, view_angle=(3
 
 # NEW FUNCTION: Plot simulation observables
 def plot_simulation_results(ω_squared, S_squared, energies, acceptance_rate, filename=None):
-    """
-    Plot the results of a polymer simulation.
-    
-    Parameters:
-    - ω_squared: End-to-end distance squared over time
-    - S_squared: Radius of gyration squared over time
-    - energies: Total energy over time
-    - acceptance_rate: Acceptance rate over time
-    - filename: Output filename for saving
-    """
     fig = plt.figure(figsize=(12, 10))
     
     # End-to-end distance squared
@@ -610,21 +510,12 @@ def plot_simulation_results(ω_squared, S_squared, energies, acceptance_rate, fi
     plt.show()
 
 # NEW FUNCTION: Plot energy distributions
-def plot_energy_distribution(neutral_energies, attractive_energies, repulsive_energies, filename=None):
-    """
-    Plot energy distributions for different interaction types.
-    
-    Parameters:
-    - neutral_energies: Energies from neutral simulation
-    - attractive_energies: Energies from attractive simulation
-    - repulsive_energies: Energies from repulsive simulation
-    - filename: Output filename for saving
-    """
+def plot_energy_distribution(neutral_energies, Repulsive_energies, Attractive_energies, filename=None):
     plt.figure(figsize=(10, 6))
     
     plt.hist(neutral_energies, bins=30, alpha=0.5, label='Neutral', color='blue')
-    plt.hist(attractive_energies, bins=30, alpha=0.5, label='Attractive', color='green')
-    plt.hist(repulsive_energies, bins=30, alpha=0.5, label='Repulsive', color='red')
+    plt.hist(Repulsive_energies, bins=30, alpha=0.5, label='Repulsive', color='green')
+    plt.hist(Attractive_energies, bins=30, alpha=0.5, label='Attractive', color='red')
     
     plt.xlabel('Energy')
     plt.ylabel('Frequency')
@@ -660,9 +551,9 @@ omega_sq_neutral, gyration_sq_neutral, energies_neutral, acceptance_neutral, fin
     stiffness=1.0
 )
 
-# Attractive interactions
-print("Running attractive simulation...")
-omega_sq_attractive, gyration_sq_attractive, energies_attractive, acceptance_attractive, final_polymer_attractive = pivot_run_with_energy(
+# Repulsive interactions
+print("Running Attractive simulation...")
+omega_sq_Repulsive, gyration_sq_Repulsive, energies_Repulsive, acceptance_Repulsive, final_polymer_Repulsive = pivot_run_with_energy(
     polymer.copy(),
     iterations=iterations,
     temperature=temperature,
@@ -671,9 +562,9 @@ omega_sq_attractive, gyration_sq_attractive, energies_attractive, acceptance_att
     stiffness=1.0
 )
 
-# Repulsive interactions
-print("Running repulsive simulation...")
-omega_sq_repulsive, gyration_sq_repulsive, energies_repulsive, acceptance_repulsive, final_polymer_repulsive = pivot_run_with_energy(
+# Attractive interactions
+print("Running Repulsive simulation...")
+omega_sq_Attractive, gyration_sq_Attractive, energies_Attractive, acceptance_Attractive, final_polymer_Attractive = pivot_run_with_energy(
     polymer.copy(),
     iterations=iterations,
     temperature=temperature,
@@ -687,42 +578,42 @@ print("\nSummary Statistics:")
 print(f"Neutral simulation - Average end-to-end distance: {np.mean(omega_sq_neutral):.2f}")
 print(f"Neutral simulation - Average radius of gyration: {np.mean(gyration_sq_neutral):.2f}")
 print(f"Neutral simulation - Average energy: {np.mean(energies_neutral):.2f}")
-print(f"Neutral simulation - Final acceptance rate: {acceptance_neutral[-1]:.2f}")
+print(f"Neutral simulation - Final acceptance rate: {acceptance_neutral[-1]:.4f}")
 
-print(f"Attractive simulation - Average end-to-end distance: {np.mean(omega_sq_attractive):.2f}")
-print(f"Attractive simulation - Average radius of gyration: {np.mean(gyration_sq_attractive):.2f}")
-print(f"Attractive simulation - Average energy: {np.mean(energies_attractive):.2f}")
-print(f"Attractive simulation - Final acceptance rate: {acceptance_attractive[-1]:.2f}")
+print(f"Repulsive simulation - Average end-to-end distance: {np.mean(omega_sq_Repulsive):.2f}")
+print(f"Repulsive simulation - Average radius of gyration: {np.mean(gyration_sq_Repulsive):.2f}")
+print(f"Repulsive simulation - Average energy: {np.mean(energies_Repulsive):.2f}")
+print(f"Repulsive simulation - Final acceptance rate: {acceptance_Repulsive[-1]:.2f}")
 
-print(f"Repulsive simulation - Average end-to-end distance: {np.mean(omega_sq_repulsive):.2f}")
-print(f"Repulsive simulation - Average radius of gyration: {np.mean(gyration_sq_repulsive):.2f}")
-print(f"Repulsive simulation - Average energy: {np.mean(energies_repulsive):.2f}")
-print(f"Repulsive simulation - Final acceptance rate: {acceptance_repulsive[-1]:.2f}")
+print(f"Attractive simulation - Average end-to-end distance: {np.mean(omega_sq_Attractive):.2f}")
+print(f"Attractive simulation - Average radius of gyration: {np.mean(gyration_sq_Attractive):.2f}")
+print(f"Attractive simulation - Average energy: {np.mean(energies_Attractive):.2f}")
+print(f"Attractive simulation - Final acceptance rate: {acceptance_Attractive[-1]:.2f}")
 
 # Plot 3D visualizations of the final configurations
 print("\nGenerating 3D visualizations...")
 plot_3d_walk_with_energy(
     final_polymer_neutral, 
-    interaction_strength=0.0,
+    interaction_strength=2.0,
     interaction_range=2.0
 )
 
 plot_3d_walk_with_energy(
-    final_polymer_attractive, 
+    final_polymer_Repulsive, 
     interaction_strength=-1.0,
     interaction_range=2.0
 )
 
 plot_3d_walk_with_energy(
-    final_polymer_repulsive, 
+    final_polymer_Attractive, 
     interaction_strength=1.0,
     interaction_range=2.0
-)
+)#
 
 # Compare all three configurations side by side
 compare_polymer_configurations(
-    [final_polymer_neutral, final_polymer_attractive, final_polymer_repulsive],
-    ["Neutral", "Attractive", "Repulsive"]
+    [final_polymer_neutral, final_polymer_Repulsive, final_polymer_Attractive],
+    ["Neutral", "Repulsive", "Attractive"]
 )
 
 # Plot simulation statistics
@@ -735,16 +626,16 @@ plot_simulation_results(
 
 # Plot simulation statistics
 plot_simulation_results(
-    omega_sq_attractive, 
-    gyration_sq_attractive, 
-    energies_attractive, 
-    acceptance_attractive
+    omega_sq_Repulsive, 
+    gyration_sq_Repulsive, 
+    energies_Repulsive, 
+    acceptance_Repulsive
 )
 
 # Plot simulation statistics
 plot_simulation_results(
-    omega_sq_repulsive, 
-    gyration_sq_repulsive, 
-    energies_repulsive, 
-    acceptance_repulsive
+    omega_sq_Attractive, 
+    gyration_sq_Attractive, 
+    energies_Attractive, 
+    acceptance_Attractive
 )
